@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${PRINTLAB_DB_URL:jdbc:postgresql://localhost:5432/printlab_db}
+    username: ${PRINTLAB_DB_USER:printlab_app}
+    password: ${PRINTLAB_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
