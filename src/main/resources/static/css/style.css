@@ -3,3 +3,16 @@
 
 /* Непрерывная лента: две одинаковые группы создают бесшовное повторение. */
 .ticker{overflow:hidden}.ticker-track{display:flex;width:max-content;animation:ticker-scroll 24s linear infinite}.ticker-group{display:flex;align-items:center;justify-content:space-around;gap:clamp(28px,5vw,90px);width:max(100vw,760px);white-space:nowrap}.ticker-group span{flex-shrink:0}@keyframes ticker-scroll{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.ticker-track{animation:none}}
+
+/* На устройствах с мышью карточка мягко выходит на передний план. */
+@media (min-width: 769px) and (hover: hover) {
+  .benefit-grid { transition: grid-template-columns 300ms ease; }
+  .benefit-grid article { position: relative; transform-origin: center; transition: transform 300ms ease, background-color 300ms ease, box-shadow 300ms ease; }
+  .benefit-grid:has(article:nth-child(1):hover) { grid-template-columns: 1.12fr .94fr .94fr; }
+  .benefit-grid:has(article:nth-child(2):hover) { grid-template-columns: .94fr 1.12fr .94fr; }
+  .benefit-grid:has(article:nth-child(3):hover) { grid-template-columns: .94fr .94fr 1.12fr; }
+  .benefit-grid article:hover { z-index: 1; transform: translateY(-5px) scale(1.025); background-color: #fff; box-shadow: 0 12px 26px #17171714; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .benefit-grid, .benefit-grid article { transition: none !important; }
+}
