@@ -7,3 +7,9 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 10485760B
+      max-request-size: 11534336B
+printlab:
+  upload-dir: ${PRINTLAB_UPLOAD_DIR:local/uploads}
