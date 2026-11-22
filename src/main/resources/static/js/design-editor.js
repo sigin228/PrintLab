@@ -10,11 +10,36 @@
   const state={front:[],back:[]}; let side='front', selected=null, dirty=false, saving=false, restoring=!!root.dataset.designId, loadFailed=false, revision=0, designId=root.dataset.designId || '', nextId=1;
   const stage=new Konva.Stage({container:'stage-container',width:W,height:H});
   const backdrop=new Konva.Layer(), layer=new Konva.Layer();stage.add(backdrop,layer);
-  const garment=new Konva.Line({points:[150,55,205,32,295,32,350,55,445,120,395,208,355,185,355,570,145,570,145,185,105,208,55,120],closed:true,fill:'#e1e1d9',stroke:'#a7aaa1',strokeWidth:2}); backdrop.add(garment);
-  const collar=new Konva.Line({points:[205,32,215,55,250,65,285,55,295,32],stroke:'#a7aaa1',strokeWidth:2,tension:.5}); backdrop.add(collar);
-  const hood=new Konva.Line({points:[205,32,215,13,250,7,285,13,295,32,280,65,220,65],closed:true,fill:'#c5c8be',stroke:'#a7aaa1',strokeWidth:2,visible:root.dataset.category==='HOODIE'}); backdrop.add(hood);
-  const sideLabel=new Konva.Text({x:210,y:105,width:80,text:'ПЕРЕД',align:'center',fontSize:12,fill:'#666b70'});backdrop.add(sideLabel);
-  function updateGarment(){const colors={Black:'#444541',White:'#f9f9f5',Grey:'#b5b7b1',Beige:'#d9c7af'};const color=$('variant').selectedOptions[0]?.dataset.color;garment.fill(colors[color]||'#e1e1d9');hood.fill(colors[color]||'#c5c8be');collar.visible(side==='front');hood.visible(root.dataset.category==='HOODIE');sideLabel.text(side==='front'?'ПЕРЕД':'СПИНА');sideLabel.fill(color==='Black'?'#fff':'#555');backdrop.batchDraw();}
+  // Иллюстрация одежды не участвует в editor_state: координаты печати остаются прежними.
+  const isHoodie=root.dataset.category==='HOODIE', isSweat=root.dataset.category==='SWEATSHIRT';
+  const garment=new Konva.Path({data: isHoodie||isSweat
+    ? 'M 194 91 Q 180 96 159 103 L 101 126 Q 87 132 79 151 L 38 350 Q 52 366 86 370 L 126 240 L 132 492 Q 250 507 368 492 L 374 240 L 414 370 Q 448 366 462 350 L 421 151 Q 413 132 399 126 L 341 103 Q 320 96 306 91 Q 250 111 194 91 Z'
+    : 'M 195 91 Q 177 94 157 104 L 72 147 Q 57 155 48 171 L 91 251 Q 107 252 132 235 L 132 492 Q 250 505 368 492 L 368 235 Q 393 252 409 251 L 452 171 Q 443 155 428 147 L 343 104 Q 323 94 305 91 Q 250 112 195 91 Z',
+    strokeWidth:1.5,shadowColor:'#171717',shadowBlur:18,shadowOffsetY:10,shadowOpacity:.13});
+  backdrop.add(garment);
+  const details=new Konva.Group({listening:false}); backdrop.add(details);
+  function updateGarment(){
+    const palettes={Black:['#282a29','#444643','#303231','#747771'],White:['#d9dcd5','#fffefa','#e8eae4','#a9aea5'],Grey:['#92958f','#c9cbc5','#aaada6','#777c75'],Beige:['#b8a58e','#e7d9c5','#d0bea6','#a4927e']};
+    const color=$('variant').selectedOptions[0]?.dataset.color, p=palettes[color]||palettes.White;
+    garment.stroke(p[3]); garment.fillLinearGradientStartPoint({x:60,y:100}); garment.fillLinearGradientEndPoint({x:430,y:480}); garment.fillLinearGradientColorStops([0,p[0],.34,p[1],.72,p[2],1,p[0]]);
+    details.destroyChildren();
+    const line=(data,opacity=.35,width=1.5)=>details.add(new Konva.Path({data,stroke:p[3],strokeWidth:width,opacity,lineCap:'round',lineJoin:'round'}));
+    // Col, coutures et plis évoquent le tissu sans gêner la zone de création.
+    if(isHoodie){
+      details.add(new Konva.Path({data:side==='front'?'M 194 91 Q 194 33 250 28 Q 306 33 306 91 Q 293 117 250 126 Q 207 117 194 91 Z':'M 194 91 Q 194 30 250 27 Q 306 30 306 91 Q 285 111 250 115 Q 215 111 194 91 Z',fill:p[2],stroke:p[3],strokeWidth:1.5}));
+      line(side==='front'?'M 203 88 Q 250 115 297 88':'M 203 91 Q 250 102 297 91',.7,2);
+      if(side==='front'){line('M 229 111 L 225 151 M 271 111 L 275 151',.65,2);line('M 160 448 Q 250 457 340 448 M 160 448 L 157 477 Q 250 483 343 477 L 340 448',.45);}
+    }else{
+      details.add(new Konva.Path({data:side==='front'?'M 195 91 Q 208 128 250 129 Q 292 128 305 91 Q 293 88 286 87 Q 278 107 250 108 Q 222 107 214 87 Z':'M 195 91 Q 213 109 250 109 Q 287 109 305 91 L 286 87 Q 250 98 214 87 Z',fill:p[0],stroke:p[3],strokeWidth:1}));
+      line(side==='front'?'M 202 94 Q 218 122 250 122 Q 282 122 298 94':'M 202 94 Q 250 106 298 94',.55);
+    }
+    line('M 132 235 Q 139 199 134 174 M 368 235 Q 361 199 366 174',.38);
+    line(isHoodie||isSweat?'M 43 338 Q 64 351 89 352 M 411 352 Q 436 351 457 338':'M 85 239 Q 106 237 126 223 M 374 223 Q 394 237 415 239',.5);
+    line('M 135 477 Q 250 490 365 477',.45); line('M 145 485 Q 250 496 355 485',.22);
+    line('M 145 252 Q 156 290 145 325 M 355 252 Q 344 290 355 325 M 153 399 Q 158 430 149 457 M 347 399 Q 342 430 351 457',.18,2);
+    if(isHoodie||isSweat) line('M 135 465 Q 250 476 365 465 M 43 340 L 40 351 M 457 340 L 460 351',.35);
+    backdrop.batchDraw();
+  }
   backdrop.add(new Konva.Rect({...bounds,stroke:'#737b69',strokeWidth:1,dash:[7,6]}));
   const transformer=new Konva.Transformer({rotateEnabled:true,keepRatio:true,enabledAnchors:['top-left','top-right','bottom-left','bottom-right'],borderStroke:'#485200',anchorStroke:'#485200',anchorFill:'#d9ff43',anchorSize:9});layer.add(transformer);
   const status=(message,error=false)=>{if($('save-status')){$('save-status').textContent=message;$('save-status').classList.toggle('editor-error',error)}};
@@ -31,6 +56,22 @@
   function drawSide(){updateGarment();layer.getChildren().filter(n=>n!==transformer).forEach(n=>n.remove());for(const item of state[side])layer.add(item.node);select(null);warning();layer.draw();}
   stage.on('click tap',e=>{if(e.target===stage||e.target.getLayer()===backdrop)select(null)});
   document.querySelectorAll('[data-side]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.side===side)return;side=button.dataset.side;document.querySelectorAll('[data-side]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.side===side)));drawSide();}));
+  // Пресеты состоят только из обычных текстовых элементов существующего формата.
+  const presets = {
+    sun:{name:'Солнце',parts:[{x:207,y:185,text:'☼',fontSize:100,color:'#a45f27'},{x:172,y:310,text:'СВЕТ ВНУТРИ',fontSize:17,color:'#171717'},{x:207,y:337,text:'✳ 01 ✳',fontSize:12,color:'#a45f27'}]},
+    star:{name:'Звезда',parts:[{x:205,y:184,text:'✳',fontSize:100,color:'#677700'},{x:164,y:310,text:'СИЯЙ ПО-СВОЕМУ',fontSize:15,color:'#171717'},{x:203,y:335,text:'★  /  ★',fontSize:13,color:'#677700'}]},
+    orbit:{name:'Орбита',parts:[{x:205,y:188,text:'◎',fontSize:100,color:'#304a5c'},{x:174,y:311,text:'СВОЯ ОРБИТА',fontSize:17,color:'#171717'},{x:210,y:337,text:'01 / 24',fontSize:12,color:'#304a5c'}]},
+    own: {name:'Свой путь',parts:[{x:165,y:207,text:'YOUR LIFE / YOUR RULES',fontSize:10,color:'#171717'},{x:165,y:230,text:'СВОЙ\nПУТЬ.',fontSize:31,color:'#171717'},{x:165,y:307,text:'✳ 01 / 01',fontSize:14,color:'#7a8500'}]},
+    move:{name:'В движении',parts:[{x:160,y:208,text:'KEEP MOVING / 002',fontSize:10,color:'#171717'},{x:160,y:231,text:'В\nДВИЖЕНИИ',fontSize:25,color:'#171717'},{x:160,y:303,text:'↗ ВПЕРЁД',fontSize:14,color:'#687600'}]},
+    create:{name:'Создавай',parts:[{x:160,y:208,text:'CREATE EVERY DAY',fontSize:10,color:'#171717'},{x:160,y:231,text:'СОЗДАВАЙ\nСВОЁ',fontSize:25,color:'#171717'},{x:160,y:303,text:'✳ ✳ ✳',fontSize:16,color:'#a07337'}]},
+    city:{name:'Город',parts:[{x:165,y:208,text:'URBAN / EVERYDAY',fontSize:10,color:'#171717'},{x:165,y:231,text:'ГОРОД\nВНУТРИ',fontSize:28,color:'#171717'},{x:165,y:305,text:'01 — 24',fontSize:14,color:'#777777'}]}
+  };
+  document.querySelectorAll('[data-preset]').forEach(button=>button.addEventListener('click',()=>{
+    const preset=presets[button.dataset.preset];if(!preset)return;
+    if(state.front.length+state.back.length+preset.parts.length>100){$('preset-status').textContent='В дизайне может быть не больше 100 элементов. Удалите лишние элементы.';return;}
+    let title;const dark=$('variant').selectedOptions[0]?.dataset.color==='Black';for(const [i,part] of preset.parts.entries()){const color=dark?'#f7f6f2':part.color;const item=addItem('text',new Konva.Text({x:part.x,y:part.y,text:part.text,fontSize:part.fontSize,fill:color,draggable:true}));if(i===([ 'sun','star','orbit' ].includes(button.dataset.preset)?0:1))title=item;}
+    select(title);changed();warning();$('preset-status').textContent='Принт «'+preset.name+'» добавлен на сторону «'+(side==='front'?'Перед':'Спина')+'». Можно изменить каждый элемент.';
+  }));
   $('add-text').addEventListener('click',()=>{addItem('text',new Konva.Text({x:165,y:230,text:'Твой текст',fontSize:30,fill:'#171717',draggable:true}));changed();warning();});
   $('delete-element').addEventListener('click',()=>{if(!selected)return;state[side]=state[side].filter(x=>x!==selected);selected.node.destroy();select(null);changed();warning();});
   function changeProps(){if(!selected)return;let n=selected.node;if(selected.type==='text'){n.text($('text-content').value);n.fontSize(Math.max(8,Math.min(200,Number($('font-size').value)||8)));n.fill($('text-color').value);}n.position({x:Number($('position-x').value)||0,y:Number($('position-y').value)||0});const scale=Math.max(.05,Math.min(5,(Number($('scale').value)||100)/100));n.scale({x:scale,y:scale});n.rotation(Number($('rotation').value)||0);transformer.forceUpdate();list();warning();layer.batchDraw();changed();}
