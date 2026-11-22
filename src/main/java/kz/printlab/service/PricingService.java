@@ -1,6 +1,7 @@
 package kz.printlab.service;
 
 import java.time.Instant;
+import java.text.NumberFormat;
 import java.util.Locale;
 import kz.printlab.dto.PricingDto;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,7 +22,10 @@ public class PricingService {
         if (found.isEmpty()) throw new IllegalArgumentException("Недействительный промокод.");
         Promo promo = found.getFirst(); Instant now = Instant.now();
         if (!promo.active || promo.starts != null && now.isBefore(promo.starts) || promo.expires != null && !now.isBefore(promo.expires)) throw new IllegalArgumentException("Промокод недействителен или его срок истёк.");
-        if (subtotal < promo.minimum) throw new IllegalArgumentException("Сумма заказа меньше минимума для промокода.");
+        if (subtotal < promo.minimum) {
+            String minimum = NumberFormat.getIntegerInstance(Locale.forLanguageTag("ru-RU")).format(promo.minimum);
+            throw new IllegalArgumentException("Минимальная сумма заказа для этого промокода — " + minimum + " ₸.");
+        }
         if (promo.limit != null) {
             Long used = jdbc.queryForObject("select count(*) from orders where promo_code_id = ? and status <> 'CANCELLED'", Long.class, promo.id);
             if (used != null && used >= promo.limit) throw new IllegalArgumentException("Лимит использования промокода исчерпан.");

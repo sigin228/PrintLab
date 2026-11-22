@@ -1,7 +1,9 @@
 package kz.printlab.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import kz.printlab.dto.*;
 import kz.printlab.entity.*;
 import kz.printlab.repository.*;
@@ -50,17 +52,19 @@ public class CartService {
     @Transactional(readOnly = true)
     public CartSummaryDto getCart() {
         User user = current();
-        List<CartItemResponse> lines = carts.findByUserId(user.getId()).map(c -> items.findByCartIdOrderById(c.getId()).stream().map(this::toResponse).toList()).orElseGet(List::of);
+        List<CartItem> cartItems = carts.findByUserId(user.getId()).map(c -> items.findByCartIdOrderById(c.getId())).orElseGet(List::of);
+        Map<Long,Long> quantities = cartItems.stream().collect(Collectors.groupingBy(i -> i.getVariant().getId(), Collectors.summingLong(CartItem::getQuantity)));
+        List<CartItemResponse> lines = cartItems.stream().map(i -> toResponse(i, quantities.get(i.getVariant().getId()))).toList();
         long total = 0;
         for (CartItemResponse line : lines) total = Math.addExact(total, line.lineTotal());
         return new CartSummaryDto(lines, total);
     }
-    private CartItemResponse toResponse(CartItem item) {
+    private CartItemResponse toResponse(CartItem item, long totalQuantity) {
         ProductVariant v = item.getVariant(); Product p = v.getProduct(); Design d = item.getDesign();
         long price = Math.addExact(Math.addExact(p.getBasePriceKzt(), v.getExtraPriceKzt()), d == null ? 0 : d.getPrintPriceKzt());
         return new CartItemResponse(item.getId(), v.getId(), p.getName(), p.getImageUrl(), v.getSize(), v.getColor(), price,
             item.getQuantity(), v.getStockQuantity(), d == null ? null : d.getId(), d == null ? null : d.getTitle(),
-            Math.multiplyExact(price, item.getQuantity()), v.isActive() && p.isActive() && item.getQuantity() <= v.getStockQuantity());
+            Math.multiplyExact(price, item.getQuantity()), v.isActive() && p.isActive() && totalQuantity <= v.getStockQuantity());
     }
     @Transactional
     public void add(CartItemRequest request) {

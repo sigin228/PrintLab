@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 class CartIntegrationTests {
     @Autowired JdbcTemplate jdbc;
     @Autowired CartService cart;
+    @Autowired jakarta.persistence.EntityManager entityManager;
     String email, otherEmail;
     long userId, otherId, productId, variantId, otherVariantId, designId, foreignDesignId;
     @BeforeEach void setup() {
@@ -49,6 +50,17 @@ class CartIntegrationTests {
     @Test void stockIsCheckedAcrossLines() {
         cart.add(new CartItemRequest(variantId,designId,3));
         assertThrows(IllegalArgumentException.class, () -> cart.add(new CartItemRequest(variantId,null,2)));
+    }
+    @Test void reducedStockMarksAllLinesOfVariantUnavailable() {
+        cart.add(new CartItemRequest(variantId,designId,2));
+        cart.add(new CartItemRequest(variantId,null,2));
+        cart.add(new CartItemRequest(otherVariantId,null,1));
+        entityManager.flush();
+        jdbc.update("update product_variants set stock_quantity=3 where id=?",variantId);
+        entityManager.clear();
+        var result=cart.getCart().items();
+        assertEquals(2,result.stream().filter(i -> i.variantId()==variantId && !i.available()).count());
+        assertTrue(result.stream().filter(i -> i.variantId()==otherVariantId).findFirst().orElseThrow().available());
     }
     @Test void foreignDesignIsNotAccessible() {
         assertEquals(404,assertThrows(ResponseStatusException.class, () -> cart.add(new CartItemRequest(variantId,foreignDesignId,1))).getStatusCode().value());

@@ -4,6 +4,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,5 +27,13 @@ class AdminSecurityTests {
     }
     @Test void productImagesArePublicButMissingImagesReturn404() throws Exception {
         mvc.perform(get("/product-images/00000000-0000-0000-0000-000000000000")).andExpect(status().isNotFound());
+    }
+    @Test void adminNavigationIsVisibleOnlyToAdmin() throws Exception {
+        mvc.perform(get("/").with(user("admin").roles("ADMIN"))).andExpect(status().isOk())
+            .andExpect(content().string(containsString("Админ-панель")));
+        mvc.perform(get("/").with(user("customer").roles("CUSTOMER"))).andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("Админ-панель"))));
+        mvc.perform(get("/")).andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("Админ-панель"))));
     }
 }

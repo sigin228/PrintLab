@@ -52,6 +52,14 @@ class OrderIntegrationTests {
         assertEquals(5,jdbc.queryForObject("select stock_quantity from product_variants where id=?",Integer.class,variant));
         assertEquals(1,jdbc.queryForObject("select count(*) from cart_items where cart_id=?",Integer.class,cart));
     }
+    @Test void promoMinimumErrorReportsConfiguredThreshold() {
+        String code="M"+UUID.randomUUID().toString().replace("-", "").toUpperCase();
+        jdbc.update("insert into promo_codes(code,discount_type,discount_value,min_order_kzt) values (?,'FIXED',500,15000)",code);
+        IllegalArgumentException error=assertThrows(IllegalArgumentException.class,()->orders.preview(code));
+        String message=error.getMessage().replace("\u00a0", " ").replace("\u202f", " ");
+        assertTrue(message.contains("15 000 ₸"));
+        assertEquals(1,jdbc.queryForObject("select count(*) from cart_items where cart_id=?",Integer.class,cart));
+    }
     @Test void anotherUserCannotReadOrder() {
         long id=orders.checkout(UUID.randomUUID(),"Name","123","Address","");
         String second="x"+UUID.randomUUID()+"@example.com";
