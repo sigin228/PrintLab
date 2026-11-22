@@ -8,6 +8,7 @@
 - GET/POST `/checkout`, POST `/checkout/preview` — оформление и расчёт скидки.
 - GET `/orders`, `/orders/{id}`, `/orders/{id}/images/{fileId}`; POST `/orders/{id}/cancel`, `/orders/{id}/pay` — заказы и демо-оплата владельца.
 - GET `/wallet`, POST `/wallet/top-up` — виртуальный баланс.
-- `/admin`, `/admin/products/**`, `/admin/orders/**`, `/admin/prints` — административные операции.
+- `/admin`, `/admin/products/**`, `/admin/orders/**`, `/admin/prints`, `/admin/promos` — административные операции, включая управление промокодами и сообщения по заказу.
+- GET `/admin-prints/{id}/image` и `/product-images/{id}` — изображения принтов и товаров; содержимое загружается администратором.
 
 Изменяющие запросы требуют CSRF и соответствующей авторизации.
