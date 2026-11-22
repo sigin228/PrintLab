@@ -52,6 +52,21 @@ class DesignServiceTests {
             assertEquals(mapper.readTree(json),designs.getDesignById(saved.id()).editorState());
             String persisted=jdbc.queryForObject("select editor_state::text from designs where id=?",String.class,saved.id());
             assertEquals(mapper.readTree(json),mapper.readTree(persisted));
+            String id1=java.util.UUID.randomUUID().toString(), id2=java.util.UUID.randomUUID().toString(), id3=java.util.UUID.randomUUID().toString();
+            String stateV2="{\"version\":2,\"productId\":"+product+",\"variantId\":"+variant+",\"front\":["
+                +"{\"type\":\"text\",\"id\":\""+id1+"\",\"name\":\"Надпись\",\"visible\":true,\"x\":1,\"y\":2,\"scaleX\":1,\"scaleY\":1,\"rotation\":0,\"text\":\"Привет\",\"fontSize\":30,\"width\":170,\"height\":36,\"color\":\"#171717\",\"fontFamily\":\"Manrope\",\"fontStyle\":\"bold\",\"align\":\"center\",\"letterSpacing\":2},"
+                +"{\"type\":\"preset\",\"id\":\""+id2+"\",\"name\":\"Графика\",\"visible\":false,\"x\":10,\"y\":20,\"scaleX\":1,\"scaleY\":1,\"rotation\":0,\"presetId\":\"urban-motion\"}],"
+                +"\"back\":[{\"type\":\"shape\",\"id\":\""+id3+"\",\"name\":\"Звезда\",\"visible\":true,\"x\":1,\"y\":2,\"scaleX\":1,\"scaleY\":1,\"rotation\":0,\"shapeId\":\"star\",\"color\":\"#ffffff\"}]}";
+            designs.updateDesign(saved.id(),new DesignRequest("Тест 2",mapper.readTree(stateV2)));
+            assertEquals(mapper.readTree(stateV2),designs.getDesignById(saved.id()).editorState());
+            assertEquals(2,jdbc.queryForObject("select editor_version from designs where id=?",Integer.class,saved.id()));
+            assertEquals(mapper.readTree(stateV2),mapper.readTree(jdbc.queryForObject("select editor_state::text from designs where id=?",String.class,saved.id())));
+            assertThrows(ResponseStatusException.class,()->designs.updateDesign(saved.id(),new DesignRequest("Тест",mapper.readTree(stateV2.replace("urban-motion","https://evil.invalid/print.svg")))));
+            assertThrows(ResponseStatusException.class,()->designs.updateDesign(saved.id(),new DesignRequest("Тест",mapper.readTree(stateV2.replace(id2,id1)))));
+            assertThrows(ResponseStatusException.class,()->designs.updateDesign(saved.id(),new DesignRequest("Тест",mapper.readTree(stateV2.replace("\"width\":170", "\"width\":-1")))));
+            String stateAuto=stateV2.replace("\"width\":170", "\"autoWidth\":true,\"width\":170");
+            assertEquals(mapper.readTree(stateAuto), designs.updateDesign(saved.id(),new DesignRequest("Тест",mapper.readTree(stateAuto))).editorState());
+            assertThrows(ResponseStatusException.class,()->designs.updateDesign(saved.id(),new DesignRequest("Тест",mapper.readTree(stateAuto.replace("\"autoWidth\":true", "\"autoWidth\":\"yes\"")))));
             String other="other-"+java.util.UUID.randomUUID()+"@example.org";
             jdbc.update("insert into users(email,password_hash,role,enabled,created_at) values (?, 'test','CUSTOMER',true,now())",other);
             SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(other,"",java.util.List.of()));
@@ -79,5 +94,6 @@ class DesignServiceTests {
         assertThrows(ResponseStatusException.class,()->storage.storeUploadedImage(1,new MockMultipartFile("file","art.jpg","image/jpeg",bytes.toByteArray())));
     }
 }
+
 
 
