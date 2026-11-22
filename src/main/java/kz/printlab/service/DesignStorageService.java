@@ -57,6 +57,7 @@ public class DesignStorageService {
           catch (IOException | RuntimeException e) { throw invalid("Не удалось обработать изображение"); }
     }
     public boolean belongsTo(long userId, UUID id) { return Files.isRegularFile(path(userId, id)); }
+    boolean deleteRegisteredImage(long userId, UUID id) throws IOException { return Files.deleteIfExists(path(userId, id)); }
     public byte[] loadAuthorizedImage(long userId, UUID id) {
         try { return Files.readAllBytes(path(userId, id)); }
         catch (IOException e) { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

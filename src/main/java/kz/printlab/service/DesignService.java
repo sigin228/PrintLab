@@ -15,9 +15,9 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class DesignService {
     private final DesignRepository designs; private final UserRepository users; private final CartItemRepository cartItems;
-    private final DesignStorageService storage; private final ObjectMapper mapper; private final ProductVariantRepository variants;
-    public DesignService(DesignRepository designs, UserRepository users, CartItemRepository cartItems, DesignStorageService storage, ObjectMapper mapper, ProductVariantRepository variants) {
-        this.designs=designs; this.users=users; this.cartItems=cartItems; this.storage=storage; this.mapper=mapper; this.variants=variants;
+    private final DesignStorageService storage; private final ObjectMapper mapper; private final ProductVariantRepository variants; private final AdminPrintPresetService presets;
+    public DesignService(DesignRepository designs, UserRepository users, CartItemRepository cartItems, DesignStorageService storage, ObjectMapper mapper, ProductVariantRepository variants, AdminPrintPresetService presets) {
+        this.designs=designs; this.users=users; this.cartItems=cartItems; this.storage=storage; this.mapper=mapper; this.variants=variants; this.presets=presets;
     }
     public User currentUser() {
         var authentication=SecurityContextHolder.getContext().getAuthentication();
@@ -105,7 +105,15 @@ public class DesignService {
                 JsonNode color = element.get("color");
                 if (!isOneOf(element.get("shapeId"), Set.of("circle", "square", "triangle", "star")) || color == null || !color.isTextual() || !color.textValue().matches("#[0-9a-fA-F]{6}")) throw invalid("Неверная фигура");
             } else {
-                if (!isOneOf(element.get("presetId"), Set.of("minimal-typography", "urban-motion", "retro-sunset", "abstract-geometry", "vintage-sport", "botanical", "japanese-graphic", "cyber-typography", "skate-culture", "monochrome-art", "cosmic-orbit", "minimal-logo"))) throw invalid("Неизвестный пресет");
+                JsonNode preset = element.get("presetId");
+                if (preset == null || !preset.isTextual()) throw invalid("Неизвестный пресет");
+                String value=preset.textValue();
+                if (value.startsWith("admin:")) {
+                    try {
+                        String raw=value.substring(6); UUID id=UUID.fromString(raw);
+                        if (!id.toString().equals(raw) || !presets.exists(id)) throw invalid("Неизвестный пресет");
+                    } catch (IllegalArgumentException e) { throw invalid("Неизвестный пресет"); }
+                } else if (!isOneOf(preset, Set.of("minimal-typography", "urban-motion", "retro-sunset", "abstract-geometry", "vintage-sport", "botanical", "japanese-graphic", "cyber-typography", "skate-culture", "monochrome-art", "cosmic-orbit", "minimal-logo"))) throw invalid("Неизвестный пресет");
             }
         }
         return count;

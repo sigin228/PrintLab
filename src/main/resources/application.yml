@@ -13,3 +13,5 @@ spring:
       max-request-size: 11534336B
 printlab:
   upload-dir: ${PRINTLAB_UPLOAD_DIR:local/uploads}
+  mail:
+    from: ${PRINTLAB_MAIL_FROM:}
