@@ -18,6 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class CommercePageIntegrationTests {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean kz.printlab.service.DeliveryAddressService addresses;
+    @org.junit.jupiter.api.BeforeEach void mockAddress() { org.mockito.Mockito.when(addresses.complete(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn("Астана, Тестовая, 1"); }
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
 
@@ -45,7 +47,7 @@ class CommercePageIntegrationTests {
         mvc.perform(post("/checkout/preview").with(customer).with(csrf()).param("checkoutKey",key).param("promoCode",code))
             .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("9000")));
         mvc.perform(post("/checkout").with(customer).with(csrf()).param("checkoutKey",key)
-                .param("deliveryName","Test User").param("deliveryPhone","123").param("deliveryAddress","Test address").param("promoCode",code))
+                .param("deliveryName","Test User").param("deliveryPhone","+77011234567").param("deliveryAddress","Test address").param("deliveryLatitude","51.1").param("deliveryLongitude","71.4").param("promoCode",code))
             .andExpect(status().is3xxRedirection());
         long order=jdbc.queryForObject("select id from orders where checkout_key=?::uuid",Long.class,key);
         assertEquals(9000L,jdbc.queryForObject("select total_kzt from orders where id=?",Long.class,order));

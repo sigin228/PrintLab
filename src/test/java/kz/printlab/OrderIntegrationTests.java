@@ -19,6 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 @SpringBootTest
 @Transactional
 class OrderIntegrationTests {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean kz.printlab.service.DeliveryAddressService addresses;
+    @org.junit.jupiter.api.BeforeEach void mockAddress() { org.mockito.Mockito.when(addresses.complete(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn("Астана, Тестовая, 1"); }
     @Autowired JdbcTemplate jdbc;
     @Autowired OrderService orders;
     long user, variant, cart;
@@ -36,8 +38,8 @@ class OrderIntegrationTests {
     @Test void checkoutIsIdempotentAndCancellationRestoresStockAndPromoUse() {
         String code="T"+UUID.randomUUID().toString().replace("-","").toUpperCase();
         jdbc.update("insert into promo_codes(code,discount_type,discount_value,usage_limit) values (?,'PERCENT',10,1)",code);
-        UUID key=UUID.randomUUID(); long id=orders.checkout(key,"Иван","123","Адрес",code);
-        assertEquals(id,orders.checkout(key,"Иван","123","Адрес",code));
+        UUID key=UUID.randomUUID(); long id=orders.checkout(key,"Иван","+77011234567","Адрес",code,"51.1","71.4","");
+        assertEquals(id,orders.checkout(key,"Иван","+77011234567","Адрес",code,"51.1","71.4",""));
         assertEquals(9000,orders.get(id).totalKzt());
         assertEquals(1,orders.items(id).size());
         assertEquals(3,jdbc.queryForObject("select stock_quantity from product_variants where id=?",Integer.class,variant));
@@ -61,7 +63,7 @@ class OrderIntegrationTests {
         assertEquals(1,jdbc.queryForObject("select count(*) from cart_items where cart_id=?",Integer.class,cart));
     }
     @Test void anotherUserCannotReadOrder() {
-        long id=orders.checkout(UUID.randomUUID(),"Name","123","Address","");
+        long id=orders.checkout(UUID.randomUUID(),"Name","+77011234567","Address","","51.1","71.4","");
         String second="x"+UUID.randomUUID()+"@example.com";
         jdbc.update("insert into users(email,password_hash,role,enabled,created_at) values (?,'hash','CUSTOMER',true,now())",second);
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(second,"",java.util.List.of()));

@@ -106,3 +106,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .studio-rail button > .icon, .studio-bottom-tools button > .icon { width: 22px; height: 22px; }
 .studio-tools .preset-name span .icon { width: 15px; height: 15px; }
 .studio-back .icon, .cart-back .icon, .cart-summary-link .icon, .back-link .icon, .admin-menu .icon { width: 18px; height: 18px; }
+
+/* Address selection */
+.address-picker { margin-top: .8rem; }
+.address-picker-note, .address-map-status { color: var(--color-muted, #666b70); font-size: .875rem; line-height: 1.5; }
+.address-map-toggle { min-height: 44px; margin: .5rem 0 1rem; }
+.address-map-panel { margin-bottom: 1rem; }
+.address-map { height: 340px; width: 100%; z-index: 0; background: #e9e8e2; }
+.address-map-status { min-height: 1.5em; }
+.address-picker .field { margin-top: 1rem; }
+@media (max-width: 480px) { .address-map { height: 280px; } }

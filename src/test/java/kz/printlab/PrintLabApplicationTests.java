@@ -40,7 +40,7 @@ class PrintLabApplicationTests {
    assertNotNull(loginByName.getRequest().getSession(false));
    var login=mvc.perform(post("/login").with(csrf()).param("username",email).param("password","Password1")).andExpect(status().is3xxRedirection()).andReturn();
    MockHttpSession session=(MockHttpSession)login.getRequest().getSession(false); assertNotNull(session);
-   mvc.perform(post("/profile").session(session).with(csrf()).param("fullName","Test User").param("city","Astana").param("phone","123").param("deliveryAddress","Test address")).andExpect(redirectedUrl("/profile?saved"));
+   mvc.perform(post("/profile").session(session).with(csrf()).param("fullName","Test User").param("city","Astana").param("phone","+77011234567").param("deliveryAddress","")).andExpect(redirectedUrl("/profile?saved"));
    assertEquals("Astana",jdbc.queryForObject("select p.city from user_profiles p join users u on p.user_id=u.id where u.email=?",String.class,email));
    assertEquals("Test User",jdbc.queryForObject("select p.full_name from user_profiles p join users u on p.user_id=u.id where u.email=?",String.class,email));
    mvc.perform(post("/logout").session(session).with(csrf())).andExpect(status().is3xxRedirection());

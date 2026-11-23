@@ -18,8 +18,9 @@ public class OrderService {
     private final DesignStorageService storage;
     private final ObjectMapper mapper;
     private final PaymentService payments;
-    public OrderService(JdbcTemplate jdbc, PricingService pricing, DesignStorageService storage, ObjectMapper mapper, PaymentService payments) {
-        this.jdbc=jdbc; this.pricing=pricing; this.storage=storage; this.mapper=mapper; this.payments=payments;
+    private final DeliveryAddressService addresses;
+    public OrderService(JdbcTemplate jdbc, PricingService pricing, DesignStorageService storage, ObjectMapper mapper, PaymentService payments, DeliveryAddressService addresses) {
+        this.jdbc=jdbc; this.pricing=pricing; this.storage=storage; this.mapper=mapper; this.payments=payments; this.addresses=addresses;
     }
     private long userId(boolean lock) {
         String email=SecurityContextHolder.getContext().getAuthentication().getName();
@@ -85,12 +86,12 @@ public class OrderService {
         var lines=cartLines(userId(false)); if(lines.isEmpty()) throw new IllegalArgumentException("Корзина пуста.");
         return pricing.calculate(subtotal(lines),code,false);
     }
-    @Transactional public long checkout(UUID key,String name,String phone,String address,String code) {
+    @Transactional public long checkout(UUID key,String name,String phone,String address,String code,String lat,String lon,String apartment) {
         if(key==null) throw new IllegalArgumentException("Обновите страницу оформления заказа.");
         long user=userId(true);
         var existing=jdbc.query("select id,user_id from orders where checkout_key=?",(rs,n)->new long[]{rs.getLong(1),rs.getLong(2)},key);
         if(!existing.isEmpty()) { if(existing.getFirst()[1]!=user) throw new ResponseStatusException(HttpStatus.NOT_FOUND); return existing.getFirst()[0]; }
-        name=required(name,150,"имя получателя"); phone=required(phone,40,"телефон"); address=required(address,2000,"адрес доставки");
+        name=required(name,150,"имя получателя"); phone=KazakhstanPhone.normalize(phone); address=addresses.complete(lat,lon,apartment);
         var variants=jdbc.query("select distinct ci.variant_id from carts c join cart_items ci on ci.cart_id=c.id where c.user_id=? order by ci.variant_id",(rs,n)->rs.getLong(1),user);
         if(variants.isEmpty()) throw new IllegalArgumentException("Корзина пуста.");
         for(long variant:variants) jdbc.queryForObject("select id from product_variants where id=? for update",Long.class,variant);

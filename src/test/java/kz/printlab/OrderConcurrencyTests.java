@@ -16,6 +16,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 /** Independent committed fixtures ensure PostgreSQL locks are exercised across transactions. */
 @SpringBootTest
 class OrderConcurrencyTests {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean kz.printlab.service.DeliveryAddressService addresses;
+    @org.junit.jupiter.api.BeforeEach void mockAddress() { org.mockito.Mockito.when(addresses.complete(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn("Астана, Тестовая, 1"); }
     @Autowired JdbcTemplate jdbc;
     @Autowired OrderService orders;
     @Autowired PaymentService payments;
@@ -52,7 +54,7 @@ class OrderConcurrencyTests {
     }
     private boolean checkout(String email,String code,CountDownLatch start) throws Exception {
         auth(email);
-        try { if(!start.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("start timeout"); orders.checkout(UUID.randomUUID(),"Name","123","Address",code); return true; }
+        try { if(!start.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("start timeout"); orders.checkout(UUID.randomUUID(),"Name","+77011234567","Address",code,"51.1","71.4",""); return true; }
         catch(IllegalArgumentException expected) { return false; }
         finally { SecurityContextHolder.clearContext(); }
     }
@@ -74,7 +76,7 @@ class OrderConcurrencyTests {
     @Test void concurrentPaymentAndCancelNeverLeaveACharge() throws Exception {
         Fixture f=fixture(1); ExecutorService executor=Executors.newFixedThreadPool(2);
         try {
-            auth(f.firstEmail()); long order=orders.checkout(UUID.randomUUID(),"Name","123","Address",""); SecurityContextHolder.clearContext();
+            auth(f.firstEmail()); long order=orders.checkout(UUID.randomUUID(),"Name","+77011234567","Address","","51.1","71.4",""); SecurityContextHolder.clearContext();
             CountDownLatch start=new CountDownLatch(1);
             Future<Boolean> pay=executor.submit(()->{ auth(f.firstEmail()); try { if(!start.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("start timeout"); try { return payments.pay(order); } catch(IllegalArgumentException cancelledFirst) { return false; } } finally { SecurityContextHolder.clearContext(); } });
             Future<?> cancel=executor.submit(()->{ auth(f.firstEmail()); try { if(!start.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("start timeout"); orders.cancel(order); return null; } finally { SecurityContextHolder.clearContext(); } });
