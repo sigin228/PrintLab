@@ -68,8 +68,17 @@
   const objectUrls=new Map(), images=new Map();
   let previewMode=false, history=[], historyIndex=-1, historyBusy=false, pendingAssets=0, lastValid=null;
   const status=(message,error=false)=>{if($('save-status')){$('save-status').textContent=message;$('save-status').classList.toggle('editor-error',error)}};
-  const csrf=()=>({[document.querySelector('meta[name=csrf-header]').content]:document.querySelector('meta[name=csrf-token]').content});
-  const uuid=()=>crypto.randomUUID();
+  const csrf=()=>{const header=document.querySelector('meta[name=csrf-header]'),token=document.querySelector('meta[name=csrf-token]');if(!header?.content||!token?.content)throw new Error('Сессия устарела. Обновите страницу и войдите снова.');return {[header.content]:token.content};};
+  // randomUUID доступен только в secure context; getRandomValues также работает на HTTP LAN.
+  // Слабые случайные числа здесь не подходят: id сохраняются на сервере.
+  const uuid=()=>{
+    const c=window.crypto;
+    if(!c||typeof c.getRandomValues!=='function')throw new Error('Браузер не поддерживает безопасное создание идентификаторов. Откройте сайт в современном браузере.');
+    if(typeof c.randomUUID==='function')return c.randomUUID();
+    const b=new Uint8Array(16);c.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+    const h=Array.from(b,n=>n.toString(16).padStart(2,'0')).join('');
+    return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+  };
   const imageFromUrl=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('Не удалось открыть изображение.'));image.src=url;});
   const all=()=>[...state.front,...state.back];
   function serialize(item,internal=false){
@@ -86,9 +95,9 @@
   function checkpoint(){history=history.slice(0,historyIndex+1);history.push(historySnapshot());if(history.length>80)history.shift();historyIndex=history.length-1;updateHistoryButtons();}
   function changed(record=true){revision++;dirty=true;status('Есть несохранённые изменения');updatePrice();updateCart();if(record)checkpoint();}
   function resize(){const w=$('stage-container').clientWidth;if(!w)return;const scale=w/W;stage.width(w);stage.height(H*scale);stage.scale({x:scale,y:scale});stage.draw();}
-  new ResizeObserver(resize).observe($('stage-container'));resize();
+  if(typeof ResizeObserver==='function')new ResizeObserver(resize).observe($('stage-container'));else window.addEventListener('resize',resize);resize();
   function updatePrice(){const option=$('variant').selectedOptions[0],price=Number(option?.dataset.price);$('total-price').textContent=option?.value ? `${(price+(all().length?1000:0)).toLocaleString('ru-RU')} ₸`:'—';$('variant-info').textContent=option?.value?`Доступно: ${option.dataset.stock} шт.`:'Выберите доступный вариант.';}
-  function updateCart(){const form=$('add-to-cart');if(!form)return;form.querySelector('[name=variantId]').value=$('variant').value;form.querySelector('[name=designId]').value=designId;form.querySelector('button').disabled=!designId||dirty||!$('variant').value||saving||restoring||loadFailed||historyBusy||pendingAssets>0;}
+  function updateCart(){const form=$('add-to-cart');if(!form)return;const variant=$('variant').value;form.querySelector('[name=variantId]').value=variant;form.querySelector('[name=designId]').value=designId;const disabled=!designId||dirty||!variant||saving||restoring||loadFailed||historyBusy||pendingAssets>0;form.querySelector('button').disabled=disabled;const hint=$('cart-ready-status');if(hint)hint.textContent=loadFailed?'Не удалось загрузить дизайн. Обновите страницу.':saving||restoring||historyBusy||pendingAssets>0?'Дождитесь завершения операции.':!variant?'Выберите доступный размер и цвет.':!designId||dirty?'Сначала сохраните дизайн, затем добавьте его в корзину.':'Можно добавить вещь в корзину.';}
   function rect(item){return item.node.getClientRect({relativeTo:layer,skipShadow:true,skipStroke:true});}
   function inside(item){const r=rect(item),e=.75;return r.x>=bounds.x-e&&r.y>=bounds.y-e&&r.x+r.width<=bounds.x+bounds.width+e&&r.y+r.height<=bounds.y+bounds.height+e;}
   function warning(){if($('bounds-warning'))$('bounds-warning').hidden=!state[side].some(item=>item.visible&&!inside(item));}
@@ -103,10 +112,10 @@
     [...state[side]].reverse().forEach(item=>{
       const li=document.createElement('li');li.className='layer-item';
       const pick=document.createElement('button');pick.type='button';pick.textContent=item.name;pick.setAttribute('aria-pressed',String(item===selected));pick.addEventListener('click',()=>select(item));li.append(pick);
-      const action=(label,text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label+' «'+item.name+'»');b.title=label;b.addEventListener('click',fn);li.append(b);};
-      action(item.visible?'Скрыть':'Показать',item.visible?'◉':'○',()=>{item.visible=!item.visible;item.node.visible(item.visible);if(!item.visible&&selected===item)select(null);list();layer.batchDraw();changed();});
-      action('Переименовать','✎',()=>{const name=prompt('Название слоя:',item.name);if(name===null)return;const value=name.trim().slice(0,100);if(!value)return;item.name=value;list();changed();});
-      action('Выше','↑',()=>move(item,1));action('Ниже','↓',()=>move(item,-1));action('Удалить','×',()=>remove(item));ul.append(li);
+      const action=(label,icon,fn)=>{const b=document.createElement('button'),svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),use=document.createElementNS('http://www.w3.org/2000/svg','use');b.type='button';b.setAttribute('aria-label',label+' «'+item.name+'»');b.title=label;svg.setAttribute('class','icon');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');use.setAttribute('href','/images/icons/sprite.svg#'+icon);svg.appendChild(use);b.appendChild(svg);b.addEventListener('click',fn);li.append(b);};
+      action(item.visible?'Скрыть':'Показать',item.visible?'eye':'eye-off',()=>{item.visible=!item.visible;item.node.visible(item.visible);if(!item.visible&&selected===item)select(null);list();layer.batchDraw();changed();});
+      action('Переименовать','edit',()=>{const name=prompt('Название слоя:',item.name);if(name===null)return;const value=name.trim().slice(0,100);if(!value)return;item.name=value;list();changed();});
+      action('Выше','chevron-up',()=>move(item,1));action('Ниже','chevron-down',()=>move(item,-1));action('Удалить','trash',()=>remove(item));ul.append(li);
     });
   }
   function select(item){if(previewMode)item=null;selected=item;transformer.nodes(item&&item.visible?[item.node]:[]);transformer.moveToTop();controls();list();layer.batchDraw();}
@@ -175,6 +184,7 @@
   async function restoreGuestDraft(){const raw=sessionStorage.getItem(draftKey);if(!raw)throw new Error('В этой вкладке не найден временный макет.');const draft=JSON.parse(raw);if(draft.version!==1||Number(draft.productId)!==Number(root.dataset.productId)||!['front','back'].includes(draft.side)||!draft.snapshot||!Array.isArray(draft.snapshot.front)||!Array.isArray(draft.snapshot.back)||draft.snapshot.front.length+draft.snapshot.back.length>100)throw new Error('Не удалось прочитать временный макет.');const values=[...draft.snapshot.front,...draft.snapshot.back],keys=[...new Set(values.filter(v=>v.type==='image').map(v=>v.localKey))];if(keys.some(k=>typeof k!=='string'||!/^[0-9a-f-]{36}$/i.test(k)))throw new Error('Не удалось прочитать изображения макета.');const files=await readDraftFiles(keys);for(const [key,file] of files){const url=URL.createObjectURL(file);objectUrls.set(key,{url,file});}await loadSnapshot(draft.snapshot);const variant=$('variant');if(draft.variantId&&Array.from(variant.options).some(option=>option.value===draft.variantId&&!option.disabled))variant.value=draft.variantId;else variant.value='';$('design-title').value=typeof draft.title==='string'?draft.title.slice(0,120):'Мой дизайн';side=draft.side;document.querySelectorAll('[data-side]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.side===side)));drawSide();restoredDraftKeys=keys;hasRestoredDraft=true;dirty=true;revision++;status(draft.variantId&&!variant.value?'Макет восстановлен. Выберите доступный вариант.':'Макет восстановлен. Проверьте его и сохраните дизайн.');checkpoint();updatePrice();}
   window.addEventListener('beforeunload',e=>{if(dirty&&!leavingForLogin){e.preventDefault();e.returnValue='';}});
   window.addEventListener('pagehide',e=>{if(!e.persisted)objectUrls.forEach(v=>URL.revokeObjectURL(v.url));});
+  if(!window.crypto||typeof window.crypto.getRandomValues!=='function'){const notice=document.createElement('p');notice.className='notice error';notice.setAttribute('role','alert');notice.textContent='Браузер не поддерживает безопасное создание дизайна. Откройте сайт в современном браузере.';root.before(notice);root.inert=true;root.querySelectorAll('button,input,select,textarea').forEach(element=>element.disabled=true);return;}
   async function restore(){if(!designId&&auth&&new URLSearchParams(location.search).get('resume')==='1'){restoring=true;root.inert=true;updateCart();try{await restoreGuestDraft();}catch(err){loadFailed=true;status((err.message||'Не удалось восстановить макет.')+' Временная копия не удалена.',true);}finally{restoring=false;root.inert=false;if($('save-design'))$('save-design').disabled=loadFailed;updateCart();}return;}if(!designId){checkpoint();return;}root.inert=true;if($('save-design'))$('save-design').disabled=true;updateCart();status('Загружаем дизайн…');try{const response=await fetch(`/api/designs/${encodeURIComponent(designId)}`);if(!response.ok)throw new Error('Не удалось открыть дизайн. Проверьте доступ и попробуйте снова.');const design=await response.json();if(Number(design.editorState.productId)!==Number(root.dataset.productId))throw new Error('Дизайн относится к другому товару.');$('design-title').value=design.title;$('variant').value=String(design.editorState.variantId);await loadSnapshot(design.editorState);dirty=false;status('Сохранено');checkpoint();updatePrice();updateCart();refreshLeases();}catch(err){loadFailed=true;status((err.message||'Ошибка загрузки.')+' Сохранение отключено, чтобы не перезаписать дизайн.',true);}finally{restoring=false;root.inert=false;if($('save-design'))$('save-design').disabled=loadFailed;updateCart();}}
   updateGarment();updatePrice();updateCart();restore();
 })();

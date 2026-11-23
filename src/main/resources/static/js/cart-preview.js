@@ -32,8 +32,9 @@
   }
   async function setup(article){
     const box=article.querySelector('.cart-design-preview'),controls=article.querySelector('.cart-preview-controls'),status=article.querySelector('.cart-preview-status');if(!box||!controls||!status)return;
-    let stage=null,observer=null,renderId=0;
-    function fallback(){if(observer){observer.disconnect();observer=null;}if(stage){stage.destroy();stage=null;}box.hidden=true;controls.hidden=true;status.textContent='Предпросмотр дизайна недоступен. Фото товара показано, если оно доступно.';}
+    let stage=null,observer=null,resizeListener=null,renderId=0;
+    function stopResize(){if(observer){observer.disconnect();observer=null;}if(resizeListener){window.removeEventListener('resize',resizeListener);resizeListener=null;}}
+    function fallback(){stopResize();if(stage){stage.destroy();stage=null;}box.hidden=true;controls.hidden=true;status.textContent='Предпросмотр дизайна недоступен. Фото товара показано, если оно доступно.';}
     try{
       if(!window.Konva||!window.PrintlabMockups||!/^[1-9]\d*$/.test(article.dataset.designId||''))throw new Error('Предпросмотр недоступен');
       const response=await fetch('/api/designs/'+encodeURIComponent(article.dataset.designId),{credentials:'same-origin'});if(!response.ok)throw new Error('Дизайн недоступен');
@@ -45,18 +46,19 @@
         try{
           const [mockup,nodes]=await Promise.all([window.PrintlabMockups.load(article.dataset.category,side,article.dataset.color),Promise.all(visible(side).map(layer=>makeNode(layer,snapshot.version)))]);
           if(!mockup)throw new Error('Мокап недоступен');if(current!==renderId)return;
-          if(observer)observer.disconnect();if(stage)stage.destroy();box.replaceChildren();box.hidden=false;
+          stopResize();if(stage)stage.destroy();box.replaceChildren();box.hidden=false;
           const size=box.clientWidth;if(!size)throw new Error('Невозможно отобразить');const scale=size/500;
           stage=new Konva.Stage({container:box,width:size,height:620*scale,scaleX:scale,scaleY:scale,listening:false});const layer=new Konva.Layer({listening:false});stage.add(layer);
           const fit=Math.min(560/mockup.width,400/mockup.height),w=mockup.width*fit,h=mockup.height*fit;
           layer.add(new Konva.Image({image:mockup,x:(500-w)/2,y:90,width:w,height:h,listening:false}));nodes.forEach(node=>layer.add(node));layer.draw();
-          observer=new ResizeObserver(()=>{if(!stage)return;const width=box.clientWidth;if(!width)return;const factor=width/500;stage.width(width);stage.height(620*factor);stage.scale({x:factor,y:factor});stage.draw();});observer.observe(box);
+          const resize=()=>{if(!stage)return;const width=box.clientWidth;if(!width)return;const factor=width/500;stage.width(width);stage.height(620*factor);stage.scale({x:factor,y:factor});stage.draw();};if(typeof ResizeObserver==='function'){observer=new ResizeObserver(resize);observer.observe(box);}else{resizeListener=resize;window.addEventListener('resize',resizeListener);}
           controls.hidden=false;controls.querySelectorAll('[data-preview-side]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.previewSide===side)));status.textContent='Предварительный вид: '+(side==='front'?'перед':'спина')+'. Цвет может отличаться.';
         }catch(_){if(current===renderId)fallback();}
       }
       controls.querySelectorAll('[data-preview-side]').forEach(button=>button.addEventListener('click',()=>draw(button.dataset.previewSide)));
       await draw(!visible('front').length&&visible('back').length?'back':'front');
     }catch(_){fallback();}
+    window.addEventListener('pagehide',e=>{if(!e.persisted){stopResize();if(stage){stage.destroy();stage=null;}}});
   }
   document.querySelectorAll('.cart-line[data-design-id]').forEach(setup);
 })();
