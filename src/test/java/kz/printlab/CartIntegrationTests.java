@@ -7,17 +7,21 @@ import kz.printlab.service.CartService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @Transactional
 class CartIntegrationTests {
     @Autowired JdbcTemplate jdbc;
     @Autowired CartService cart;
+    @Autowired MockMvc mvc;
     @Autowired jakarta.persistence.EntityManager entityManager;
     String email, otherEmail;
     long userId, otherId, productId, variantId, otherVariantId, designId, foreignDesignId;
@@ -41,7 +45,7 @@ class CartIntegrationTests {
     @Test void addUpdateRemoveAndClearCalculateServerPrices() {
         cart.add(new CartItemRequest(variantId,designId,2));
         var summary = cart.getCart(); assertEquals(12500, summary.subtotal());
-        var item = summary.items().get(0); assertEquals(6250, item.unitPrice()); assertEquals(4,item.stock());
+        var item = summary.items().get(0); assertEquals(6250, item.unitPrice()); assertEquals(4,item.stock()); assertEquals("TSHIRT",item.productCategory());
         cart.updateQuantity(item.id(),3); assertEquals(18750, cart.getCart().subtotal());
         cart.remove(item.id()); assertTrue(cart.getCart().items().isEmpty());
         cart.add(new CartItemRequest(variantId,null,1)); assertEquals(5250,cart.getCart().subtotal());
@@ -75,5 +79,18 @@ class CartIntegrationTests {
     }
     @Test void quantitiesMustBePositive() {
         assertThrows(IllegalArgumentException.class, () -> cart.add(new CartItemRequest(variantId,null,0)));
+    }
+    @Test void cartExposesOnlyOwnersDesignForPreview() throws Exception {
+        cart.add(new CartItemRequest(variantId,designId,1));
+        var customer=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(email).roles("CUSTOMER");
+        var other=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(otherEmail).roles("CUSTOMER");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/cart").with(customer))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("cart-preview.js")))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("data-category=\"TSHIRT\"")));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/designs/{id}",designId).with(customer))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/designs/{id}",designId).with(other))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
     }
 }

@@ -64,7 +64,7 @@ public class CartService {
         long price = Math.addExact(Math.addExact(p.getBasePriceKzt(), v.getExtraPriceKzt()), d == null ? 0 : d.getPrintPriceKzt());
         return new CartItemResponse(item.getId(), v.getId(), p.getName(), p.getImageUrl(), v.getSize(), v.getColor(), price,
             item.getQuantity(), v.getStockQuantity(), d == null ? null : d.getId(), d == null ? null : d.getTitle(),
-            Math.multiplyExact(price, item.getQuantity()), v.isActive() && p.isActive() && totalQuantity <= v.getStockQuantity());
+            Math.multiplyExact(price, item.getQuantity()), v.isActive() && p.isActive() && totalQuantity <= v.getStockQuantity(), p.getCategory());
     }
     @Transactional
     public void add(CartItemRequest request) {
